@@ -1,17 +1,18 @@
-/* ─── AI 生成：Replicate API 代理 ─── */
+/* ─── AI 生成：智谱 CogView-4 API ─── */
 
 import type { Env } from '../types';
 
-interface ReplicatePrediction {
-  id: string;
-  status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
-  output?: string | string[];
-  error?: string;
+interface ZhipuImageResponse {
+  created: number;
+  data: Array<{
+    url: string;
+    revised_prompt?: string;
+  }>;
 }
 
 /**
  * 构建涂色线稿 prompt
- * Flux Schnell 需要英文 prompt，追加风格指令确保生成黑白线稿
+ * CogView-4 支持中英文 prompt，追加风格指令确保生成黑白线稿
  */
 function buildColoringPrompt(userPrompt: string, style?: string): string {
   const styleInstructions: Record<string, string> = {
@@ -22,80 +23,47 @@ function buildColoringPrompt(userPrompt: string, style?: string): string {
 
   const difficulty = styleInstructions[style || 'medium'] || styleInstructions.medium;
 
-  return `coloring book page, black and white line art, clean outlines, no shading, no colors, no grayscale, white background, ${difficulty}: ${userPrompt}`;
+  return `coloring page for kids, black and white line art, simple outlines, no colors, no shading: ${userPrompt}, ${difficulty}`;
 }
 
 /**
- * 调用 Replicate API 创建预测
+ * 调用智谱 CogView-4 API 生成图片
  */
-async function createPrediction(
-  apiToken: string,
-  apiBase: string,
+async function callZhipuAPI(
+  apiKey: string,
   model: string,
   prompt: string
-): Promise<ReplicatePrediction> {
-  const resp = await fetch(`${apiBase}/predictions`, {
+): Promise<string> {
+  const resp = await fetch('https://open.bigmodel.cn/api/paas/v4/images/generations', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${apiToken}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      Prefer: 'wait', // 同步等待完成（Flux Schnell 通常 <3s）
     },
     body: JSON.stringify({
-      version: model, // 或用 model string
-      input: {
-        prompt,
-        num_outputs: 1,
-        aspect_ratio: '1:1',
-        output_format: 'png',
-        output_quality: 90,
-        disable_safety_checker: true, // 涂色页不需要安全检查
-      },
+      model,
+      prompt,
+      size: '1024x1024',
+      n: 1,
     }),
   });
 
   if (!resp.ok) {
     const errBody = await resp.text();
-    throw new Error(`Replicate API error (${resp.status}): ${errBody.slice(0, 500)}`);
+    throw new Error(`Zhipu API error (${resp.status}): ${errBody.slice(0, 500)}`);
   }
 
-  return (await resp.json()) as ReplicatePrediction;
+  const result = (await resp.json()) as ZhipuImageResponse;
+
+  if (!result.data || result.data.length === 0 || !result.data[0].url) {
+    throw new Error(`Zhipu API returned no image URL: ${JSON.stringify(result)}`);
+  }
+
+  return result.data[0].url;
 }
 
 /**
- * 轮询直到预测完成
- */
-async function waitForPrediction(
-  apiToken: string,
-  apiBase: string,
-  predictionId: string,
-  maxRetries: number
-): Promise<ReplicatePrediction> {
-  for (let i = 0; i < maxRetries; i++) {
-    const resp = await fetch(`${apiBase}/predictions/${predictionId}`, {
-      headers: { Authorization: `Bearer ${apiToken}` },
-    });
-
-    if (!resp.ok) {
-      const errBody = await resp.text();
-      throw new Error(`Replicate poll error (${resp.status}): ${errBody.slice(0, 300)}`);
-    }
-
-    const pred = (await resp.json()) as ReplicatePrediction;
-
-    if (pred.status === 'succeeded' || pred.status === 'failed' || pred.status === 'canceled') {
-      return pred;
-    }
-
-    // Flux Schnell 通常 <3s，等待 1s 重试
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-
-  throw new Error('Prediction timed out');
-}
-
-/**
- * 下载预测结果图片
+ * 下载生成的图片
  */
 async function downloadImage(url: string): Promise<ArrayBuffer> {
   const resp = await fetch(url);
@@ -106,16 +74,15 @@ async function downloadImage(url: string): Promise<ArrayBuffer> {
 }
 
 /**
- * 完整生成流程：prompt → Replicate → 图片 buffer
+ * 完整生成流程：prompt → 智谱 CogView-4 → 图片 buffer
  */
 export async function generateImage(
   env: Env,
   prompt: string,
   style?: string
 ): Promise<ArrayBuffer> {
-  const apiToken = env.REPLICATE_API_TOKEN;
-  const apiBase = env.REPLICATE_API_BASE || 'https://api.replicate.com/v1';
-  const model = env.AI_MODEL || 'black-forest-labs/flux-schnell';
+  const apiKey = env.ZHIPU_API_KEY;
+  const model = env.AI_MODEL || 'cogview-4';
   const maxRetries = parseInt(env.MAX_RETRIES, 10) || 2;
 
   const fullPrompt = buildColoringPrompt(prompt, style);
@@ -124,33 +91,11 @@ export async function generateImage(
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Step 1: 创建预测（使用 Prefer: wait 可以同步等待）
-      const prediction = await createPrediction(apiToken, apiBase, model, fullPrompt);
+      // Step 1: 调用智谱 API 生成图片，获取 URL
+      const imageUrl = await callZhipuAPI(apiKey, model, fullPrompt);
 
-      // Step 2: 如果没立即完成，轮询
-      let finalPrediction = prediction;
-      if (prediction.status === 'starting' || prediction.status === 'processing') {
-        finalPrediction = await waitForPrediction(apiToken, apiBase, prediction.id, 10);
-      }
-
-      if (finalPrediction.status === 'failed') {
-        throw new Error(`AI generation failed: ${finalPrediction.error || 'unknown error'}`);
-      }
-
-      if (finalPrediction.status === 'canceled') {
-        throw new Error('AI generation was canceled');
-      }
-
-      // Step 3: 下载结果
-      const outputUrl = Array.isArray(finalPrediction.output)
-        ? finalPrediction.output[0]
-        : finalPrediction.output;
-
-      if (!outputUrl) {
-        throw new Error('No output URL in prediction result');
-      }
-
-      return await downloadImage(outputUrl);
+      // Step 2: 下载图片二进制数据
+      return await downloadImage(imageUrl);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt < maxRetries - 1) {

@@ -1,26 +1,18 @@
 name = "coloring-generator"
 main = "src/worker.ts"
 compatibility_date = "2026-04-30"
-
 [assets]
 directory = "./public"
 binding = "ASSETS"
-
 [[d1_databases]]
 binding = "DB"
 database_name = "coloring-gen-db"
-database_id = "" # 部署时由 wrangler 自动填充
-
-[[r2_buckets]]
-binding = "R2"
-bucket_name = "coloring-gen-assets"
-
+database_id = "07bf050e-b032-44bb-9cf5-535e3f508572" # 部署时由 wrangler 自动填充
 [vars]
 SITE_NAME = "AI Coloring Page Generator"
 APP_ORIGIN = "https://aicoloringmaker.com"
-AI_PROVIDER = "replicate"
-AI_MODEL = "black-forest-labs/flux-schnell"
-REPLICATE_API_BASE = "https://api.replicate.com/v1"
+AI_PROVIDER = "zhipu"
+AI_MODEL = "cogview-4"
 FREE_DAILY_LIMIT = 5
 REGISTERED_DAILY_LIMIT = 10
 MAX_IP_DAILY_LIMIT = 30
@@ -29,9 +21,7 @@ COOLDOWN_SECONDS = 60
 MAX_RETRIES = 2
 TURNSTILE_SITE_KEY = "" # Cloudflare Turnstile Site Key
 CACHE_TTL_DAYS = 30
-
 [env.production]
 vars = { APP_ORIGIN = "https://aicoloringmaker.com" }
-
 [env.staging]
 vars = { APP_ORIGIN = "https://staging.aicoloringmaker.com" }

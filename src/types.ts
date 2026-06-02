@@ -5,14 +5,14 @@ export interface Env {
   R2: R2Bucket;
   ASSETS: Fetcher;
   // Secrets
-  REPLICATE_API_TOKEN: string;
+  ZHIPU_API_KEY: string;
   TURNSTILE_SECRET_KEY: string;
   // Vars
   SITE_NAME: string;
   APP_ORIGIN: string;
   AI_PROVIDER: string;
   AI_MODEL: string;
-  REPLICATE_API_BASE: string;
+  ZHIPU_API_BASE?: string;
   FREE_DAILY_LIMIT: string;
   REGISTERED_DAILY_LIMIT: string;
   MAX_IP_DAILY_LIMIT: string;
