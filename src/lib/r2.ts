@@ -9,7 +9,7 @@ import type { Env } from '../types';
 function cacheKey(prompt: string, style?: string): string {
   const normalized = prompt.trim().toLowerCase().replace(/\s+/g, ' ');
   const styleSuffix = style ? `:${style}` : '';
-  return `cache:${normalized}${styleSuffix}.png`;
+  return `cache:${normalized}${styleSuffix}.jpg`;
 }
 
 /** 计算简单哈希（用于文件名） */
@@ -38,7 +38,7 @@ export async function uploadToR2(
   imageBuffer: ArrayBuffer,
   prompt: string,
   style?: string,
-  contentType = 'image/png'
+  contentType = 'image/jpeg'
 ): Promise<string> {
   const path = storagePath(prompt, style);
   await env.R2.put(path, imageBuffer, {
@@ -71,7 +71,7 @@ export async function getFromR2(
   const buffer = await obj.arrayBuffer();
   return {
     buffer,
-    contentType: obj.httpMetadata?.contentType || 'image/png',
+    contentType: obj.httpMetadata?.contentType || 'image/jpeg',
   };
 }
 

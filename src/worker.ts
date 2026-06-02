@@ -50,7 +50,7 @@ export default {
         const body = await obj.arrayBuffer();
         return new Response(body, {
           headers: {
-            'Content-Type': obj.httpMetadata?.contentType || 'image/png',
+            'Content-Type': obj.httpMetadata?.contentType || 'image/jpeg',
             'Cache-Control': 'public, max-age=86400',
             'ETag': obj.httpEtag || '',
           },

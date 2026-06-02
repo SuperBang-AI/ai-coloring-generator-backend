@@ -141,7 +141,7 @@ export async function handleGenerate(
     return new Response(imageBuffer, {
       status: 200,
       headers: {
-        'Content-Type': 'image/png',
+        'Content-Type': 'image/jpeg',
         'X-Cache': 'MISS',
         'Cache-Control': 'public, max-age=300',
         'X-Remaining': String(quotaCheck.remaining ?? 0),
@@ -155,7 +155,7 @@ export async function handleGenerate(
   return new Response(imageBuffer, {
     status: 200,
     headers: {
-      'Content-Type': 'image/png',
+      'Content-Type': 'image/jpeg',
       'X-Cache': 'MISS',
       'Cache-Control': 'public, max-age=86400',
       'X-Image-Url': publicUrl,
