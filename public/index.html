@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Coloring Page Generator</title>
+  <meta name="description" content="Free AI coloring page generator. Turn any text description into beautiful black-and-white coloring pages. Print-ready PNG download.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🎨</text></svg>">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fafafa;
+      color: #333;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      color: #666;
+      font-size: 1.1rem;
+    }
+    .generator-box {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #333;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+      margin-bottom: 1rem;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+    .style-options {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .style-btn {
+      padding: 0.5rem 1rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .style-btn.active {
+      border-color: #6366f1;
+      background: #eef2ff;
+      color: #4f46e5;
+    }
+    .generate-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .generate-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .result-area {
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+    .result-area img {
+      max-width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      border: 1px solid #eee;
+    }
+    .download-btn {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.6rem 1.5rem;
+      background: #10b981;
+      color: #fff;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .status {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+    .status.error {
+      background: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+    }
+    .status.success {
+      background: #f0fdf4;
+      color: #16a34a;
+      border: 1px solid #bbf7d0;
+    }
+    .status.loading {
+      background: #eff6ff;
+      color: #2563eb;
+      border: 1px solid #bfdbfe;
+    }
+    .quota-info {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 0.5rem;
+    }
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    footer {
+      text-align: center;
+      color: #999;
+      font-size: 0.85rem;
+      padding: 2rem 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎨 AI Coloring Page Generator</h1>
+      <p class="subtitle">Turn your ideas into printable coloring pages — free, fast, and beautiful</p>
+      <p class="quota-info" id="quotaInfo">Loading...</p>
+    </header>
+
+    <div class="generator-box">
+      <label for="prompt">What should we draw?</label>
+      <input
+        type="text"
+        id="prompt"
+        placeholder="e.g., a cute unicorn in a magical forest, simple dragon for kids, butterfly garden..."
+        maxlength="500"
+      />
+
+      <label>Style</label>
+      <div class="style-options">
+        <button class="style-btn active" data-style="simple">👶 Simple (ages 3-6)</button>
+        <button class="style-btn" data-style="medium">🧒 Medium (ages 6-12)</button>
+        <button class="style-btn" data-style="complex">🧑 Complex (teens+)</button>
+      </div>
+
+      <!-- Cloudflare Turnstile placeholder -->
+      <div id="turnstile-widget" style="margin-bottom: 1rem; display: none;"></div>
+
+      <button class="generate-btn" id="generateBtn" onclick="generate()">
+        ✨ Generate Coloring Page
+      </button>
+
+      <div class="result-area" id="result"></div>
+    </div>
+
+    <footer>
+      <p>Made with ❤️ by the AI Coloring team · Free to use · No registration required</p>
+    </footer>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+
+    // Style selection
+    let selectedStyle = 'simple';
+    document.querySelectorAll('.style-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedStyle = btn.dataset.style;
+      });
+    });
+
+    // Load quota
+    async function loadQuota() {
+      try {
+        const resp = await fetch(`${API_BASE}/api/usage`);
+        const data = await resp.json();
+        document.getElementById('quotaInfo').textContent =
+          `Used ${data.usedToday}/${data.dailyLimit} today · Resets at midnight UTC`;
+      } catch {
+        document.getElementById('quotaInfo').textContent = '';
+      }
+    }
+    loadQuota();
+
+    // Generate
+    async function generate() {
+      const btn = document.getElementById('generateBtn');
+      const prompt = document.getElementById('prompt').value.trim();
+      const resultDiv = document.getElementById('result');
+
+      if (!prompt) {
+        resultDiv.innerHTML = '<div class="status error">Please enter a description first.</div>';
+        return;
+      }
+
+      btn.disabled = true;
+      resultDiv.innerHTML = '<div class="status loading"><span class="spinner"></span>Generating your coloring page... (~3-5 seconds)</div>';
+
+      try {
+        const resp = await fetch(`${API_BASE}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, style: selectedStyle }),
+        });
+
+        if (!resp.ok) {
+          const err = await resp.json();
+          throw new Error(err.error || 'Generation failed');
+        }
+
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+
+        resultDiv.innerHTML = `
+          <img src="${url}" alt="Generated coloring page: ${prompt}" />
+          <br>
+          <a class="download-btn" href="${url}" download="coloring-page.png">⬇ Download PNG</a>
+          <div class="status success">✅ Done! Click download to save.</div>
+        `;
+      } catch (err) {
+        resultDiv.innerHTML = `<div class="status error">❌ ${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        loadQuota(); // 刷新额度
+      }
+    }
+
+    // Enter key support
+    document.getElementById('prompt').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') generate();
+    });
+  </script>
+</body>
+</html>
