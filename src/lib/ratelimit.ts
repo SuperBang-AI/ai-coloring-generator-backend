@@ -17,8 +17,11 @@ function now(): number {
 }
 
 function todayKey(ip: string): string {
-  const d = new Date();
-  return `${ip}:${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
+  // 使用亚洲/上海时区（用户所在地），而非 UTC
+  const tz = 'Asia/Shanghai';
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const dateStr = fmt.format(new Date()); // "YYYY-MM-DD"
+  return `${ip}:${dateStr}`;
 }
 
 /**
