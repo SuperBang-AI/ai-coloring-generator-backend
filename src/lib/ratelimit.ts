@@ -172,6 +172,38 @@ export async function consumeFreeQuota(
   };
 }
 
+/** 检查免费层额度（不消费） — 用于预检查，失败时不扣额度 */
+export async function checkFreeQuota(
+  env: Env,
+  ip: string
+): Promise<{
+  allowed: boolean;
+  code: string;
+  remaining?: number;
+  dailyLimit: number;
+}> {
+  const { count: todayCount, registered } = await getIpUsage(env, ip);
+  const dailyLimit = registered
+    ? parseInt(env.REGISTERED_DAILY_LIMIT, 10) || 10
+    : parseInt(env.FREE_DAILY_LIMIT, 10) || 5;
+
+  if (todayCount >= dailyLimit) {
+    return {
+      allowed: false,
+      code: 'DAILY_QUOTA_EXCEEDED',
+      remaining: 0,
+      dailyLimit,
+    };
+  }
+
+  return {
+    allowed: true,
+    code: 'OK',
+    remaining: dailyLimit - todayCount,
+    dailyLimit,
+  };
+}
+
 /** 获取当前 IP 的剩余次数信息（不消费） */
 export async function getQuotaInfo(
   env: Env,

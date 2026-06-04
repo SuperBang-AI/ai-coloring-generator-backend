@@ -2,16 +2,22 @@
 
 import type { Env, GenerateRequest, GenerateResponse } from '../types';
 import { json, error } from '../lib/response';
-import { checkLimit, consumeFreeQuota } from '../lib/ratelimit';
+import { checkLimit, consumeFreeQuota, checkFreeQuota } from '../lib/ratelimit';
 import { verifyTurnstile } from '../lib/turnstile';
 import { generateImage } from '../lib/ai';
 import { getFromR2, uploadToR2, getR2PublicUrl } from '../lib/r2';
 
 function getClientIP(request: Request): string {
+  // X-Quota-Id takes top priority — set by our trusted Next.js proxy
+  // This carries the client-side generated ID for per-user quota tracking
+  const quotaId = request.headers.get('X-Quota-Id');
+  if (quotaId) return quotaId;
+
+  // Fallback chain for direct access
   return (
     request.headers.get('CF-Connecting-IP') ||
-    request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
     request.headers.get('X-Real-IP') ||
+    request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
     '127.0.0.1'
   );
 }
@@ -72,20 +78,19 @@ export async function handleGenerate(
     );
   }
 
-  // Step 4: 免费层额度检查
-  const quotaCheck = await consumeFreeQuota(env, ip);
-  if (!quotaCheck.allowed) {
+  // Step 4: 免费层额度预检查（只查不扣，失败时不消耗额度）
+  const preCheck = await checkFreeQuota(env, ip);
+  if (!preCheck.allowed) {
     return error(
-      quotaCheck.code === 'DAILY_QUOTA_EXCEEDED'
-        ? `Daily free limit (${quotaCheck.dailyLimit}) reached. Try again tomorrow.`
+      preCheck.code === 'DAILY_QUOTA_EXCEEDED'
+        ? `Daily free limit (${preCheck.dailyLimit}) reached. Try again tomorrow.`
         : 'Quota exceeded',
-      quotaCheck.code,
+      preCheck.code,
       429
     );
   }
 
-  // Step 5: Turnstile 验证（超过一定次数后触发）
-  // v1: 先不做强制 Turnstile；前端传则验证
+  // Step 5: Turnstile 验证
   if (body.turnstileToken && env.TURNSTILE_SECRET_KEY) {
     const turnstileResult = await verifyTurnstile(
       body.turnstileToken,
@@ -101,14 +106,15 @@ export async function handleGenerate(
   try {
     const cached = await getFromR2(env, prompt, style);
     if (cached) {
-      // 命中缓存：直接返回图片
+      // 命中缓存：扣额度后返回
+      const quotaResult = await consumeFreeQuota(env, ip);
       return new Response(cached.buffer, {
         status: 200,
         headers: {
           'Content-Type': cached.contentType,
           'X-Cache': 'HIT',
           'Cache-Control': 'public, max-age=86400',
-          'X-Remaining': String(quotaCheck.remaining ?? 0),
+          'X-Remaining': String(quotaResult.remaining ?? 0),
         },
       });
     }
@@ -124,6 +130,7 @@ export async function handleGenerate(
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'AI generation failed';
     console.error('AI generation error:', msg);
+    // AI 生成失败，不扣额度
     return error(
       'AI generation failed. Please try again with a different prompt.',
       'AI_GENERATION_FAILED',
@@ -131,7 +138,10 @@ export async function handleGenerate(
     );
   }
 
-  // Step 8: 存储到 R2
+  // Step 8: AI 生成成功，才扣减额度
+  const quotaResult = await consumeFreeQuota(env, ip);
+
+  // Step 9: 存储到 R2
   let imagePath: string;
   try {
     imagePath = await uploadToR2(env, imageBuffer, prompt, style);
@@ -144,12 +154,12 @@ export async function handleGenerate(
         'Content-Type': 'image/jpeg',
         'X-Cache': 'MISS',
         'Cache-Control': 'public, max-age=300',
-        'X-Remaining': String(quotaCheck.remaining ?? 0),
+        'X-Remaining': String(quotaResult.remaining ?? 0),
       },
     });
   }
 
-  // Step 9: 返回结果
+  // Step 10: 返回结果
   const publicUrl = getR2PublicUrl(imagePath, env.APP_ORIGIN);
 
   return new Response(imageBuffer, {
@@ -159,7 +169,7 @@ export async function handleGenerate(
       'X-Cache': 'MISS',
       'Cache-Control': 'public, max-age=86400',
       'X-Image-Url': publicUrl,
-      'X-Remaining': String(quotaCheck.remaining ?? 0),
+      'X-Remaining': String(quotaResult.remaining ?? 0),
     },
   });
 }

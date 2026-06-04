@@ -10,7 +10,7 @@ database_name = "coloring-gen-db"
 database_id = "07bf050e-b032-44bb-9cf5-535e3f508572" # 部署时由 wrangler 自动填充
 [vars]
 SITE_NAME = "AI Coloring Page Generator"
-APP_ORIGIN = "https://aicoloringmaker.com"
+APP_ORIGIN = "https://aicoloringcrafter.art"
 AI_PROVIDER = "zhipu"
 AI_MODEL = "cogview-4"
 FREE_DAILY_LIMIT = 5
@@ -22,6 +22,14 @@ MAX_RETRIES = 2
 TURNSTILE_SITE_KEY = "" # Cloudflare Turnstile Site Key
 CACHE_TTL_DAYS = 30
 [env.production]
-vars = { APP_ORIGIN = "https://aicoloringmaker.com" }
+vars = { APP_ORIGIN = "https://aicoloringcrafter.art" }
 [env.staging]
 vars = { APP_ORIGIN = "https://staging.aicoloringmaker.com" }
+
+[[routes]]
+pattern = "aicoloringcrafter.art/*"
+zone_id = "8f5c61acc0fca4f0384f614f9fc44d9f"
+
+[[routes]]
+pattern = "www.aicoloringcrafter.art/*"
+zone_id = "8f5c61acc0fca4f0384f614f9fc44d9f"
